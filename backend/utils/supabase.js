@@ -12,7 +12,28 @@ if (!supabaseUrl || !supabaseKey) {
     console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? '[SET]' : '[MISSING]');
 }
 
-// Create client anyway (it throws if URL missing), but logging precedes it.
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create client handling potential missing keys to avoid hard crash on require
+// Explicitly check to prevent "URL not found" error from throwing immediately
+let supabase;
+
+if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+} else {
+    // Return a dummy object that logs errors when accessed, rather than crashing server startup
+    console.warn('[SUPABASE] Initializing dummy client due to missing env vars');
+    const proxyHandler = {
+        get: function (target, prop, receiver) {
+            return (...args) => {
+                const msg = `[SUPABASE ERROR] Cannot call '${String(prop)}' because SUPABASE_URL or KEY is missing. Check Vercel Env Vars.`;
+                console.error(msg);
+                return {
+                    data: null,
+                    error: { message: msg }
+                }; // Mock response structure
+            };
+        }
+    };
+    supabase = new Proxy({}, proxyHandler);
+}
 
 module.exports = supabase;

@@ -5,7 +5,18 @@ const { requireAuth } = require('./auth');
 const { hasUnlimitedAccess } = require('../utils/accessControl');
 
 const router = express.Router();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Lazy Load Gemini
+let _genAI = null;
+const getGenAI = () => {
+    if (!_genAI) {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error('GEMINI_API_KEY is missing in environment variables');
+        }
+        _genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return _genAI;
+};
 
 // Default model - User Requested 2.5 Flash
 const CHAT_MODEL = process.env.MODEL_NAME || 'gemini-2.0-flash-exp';
@@ -108,6 +119,7 @@ router.post('/message', async (req, res) => {
 
         // 3. Call AI (Gemini)
         // Replicating system instruction from geminiService.ts
+        const genAI = getGenAI();
         const model = genAI.getGenerativeModel({ model: CHAT_MODEL });
 
         const systemInstruction = `ROLE:MDnexa™.CTX:${region || 'International'}.USER_ROLE:${userRole || 'User'}.
